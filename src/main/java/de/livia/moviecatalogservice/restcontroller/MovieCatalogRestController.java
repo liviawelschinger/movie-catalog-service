@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,20 +27,23 @@ public class MovieCatalogRestController {
     @Autowired // Dependency Injection of the Bean created in the Application class
     private RestTemplate restTemplate;
 
+    @Autowired
+    private WebClient.Builder webClientBuilder;
+
 
     // http://localhost:8081/catalog/foo or http://localhost:8080/catalog/abc
     // returns [{"title":"Test name","desc":"Desc","rating":4},{"title":"Test name","desc":"Desc","rating":3}]
-    @RequestMapping("/{userId}")
+  /*  @RequestMapping("/{userId}")
     public List<CatalogItem> getCatalog (@PathVariable("userId") String userId) {
 
 
         // get all rated movie IDs
 
-        /*List<Rating> ratings = new Arrays.asList(
+        *//*List<Rating> ratings = new Arrays.asList(
             new Rating("1234", 4),
             new Rating("5678", 3)
 
-        );*/
+        );*//*
 
         List<Rating> ratings = new ArrayList<>();
         ratings.add(new Rating("1234", 4));
@@ -57,9 +61,50 @@ public class MovieCatalogRestController {
         })
                 .collect(Collectors.toList());
 
+    }*/
 
 
+     @RequestMapping("/{userId}")
+    public List<CatalogItem> getCatalog (@PathVariable("userId") String userId) {
 
+         // Reactive (webflux dependency) asynchronous
+         WebClient.Builder builder = WebClient.builder();
+
+          /*  List<Rating> ratings = new Arrays.asList(
+            new Rating("1234", 4),
+            new Rating("5678", 3)
+
+        );*/
+
+        List<Rating> ratings = new ArrayList<>();
+        ratings.add(new Rating("1234", 4));
+        ratings.add(new Rating("5678", 3));
+
+        // get all rated movie ids
+
+        // The information abot the catalog item which is hard coded here should normally come from the API
+        return ratings.stream().map(rating -> {
+            // 1st parameter URL, you want to call; 2nd parameter class response Type
+            // iteration: for each rating get the movie (movieId)
+            //Movie movie = restTemplate.getForObject("http://localhost:8082/movies/" + rating.getMovieId(), Movie.class);
+
+            // give an instance of movie; use get() because it's a GET request
+            Movie movie = webClientBuilder.build()
+                    .get()
+                    .uri("http://localhost:8082/movies/" + rating.getMovieId())
+                    // fetch
+                    .retrieve()
+                    // reactive way of getting an asynchronous object back
+                    .bodyToMono(Movie.class)
+                    // blocking execution till the Mono is filled
+                    .block();
+
+
+            // first API call
+            // for each movie ID call movieinfo service and get details
+            return new CatalogItem(movie.getTitle(), "Desc", rating.getRating());
+        })
+                .collect(Collectors.toList());
 
     }
 }
